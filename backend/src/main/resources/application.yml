@@ -1,0 +1,41 @@
+spring:
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+
+  datasource:
+    hikari:
+      jdbc-url: jdbc:h2:~/word-initial-game
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+    properties:
+      hibernate:
+        format_sql: true
+        show_sql: true
+        dialect: org.hibernate.dialect.H2Dialect
+    hibernate:
+      ddl-auto: create
+
+#  data:
+#    redis:
+#      port: 6379
+#      host: 127.0.0.1
+
+  session:
+    store-type: redis
+
+server:
+  servlet:
+    session:
+      cookie:
+        http-only: true
+        secure: true
+
+korean-dic:
+  request-url: https://krdict.korean.go.kr/api/search
+  api-key: 88246F085FC34F012B425DF1796FA07B
