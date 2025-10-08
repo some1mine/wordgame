@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Trophy, Clock, CheckCircle, XCircle, LogIn, UserPlus, Plus, DoorOpen } from 'lucide-react';
+import { Users, Trophy, Clock, CheckCircle, XCircle, LogIn, UserPlus, Plus, DoorOpen, ArrowLeft } from 'lucide-react';
 
 // API 기본 URL 설정
 const API_BASE_URL = 'http://localhost:8080'; // 여기를 실제 서버 주소로 변경하세요
 
 export default function ChosungGame() {
-  const [gameState, setGameState] = useState('login'); // login, lobby, playing, result
+  const [gameState, setGameState] = useState('login'); // login, signup, lobby, playing, result
   const [chosung, setChosung] = useState('ㄱㄴ');
   const [userAnswer, setUserAnswer] = useState('');
   const [timeLeft, setTimeLeft] = useState(30);
@@ -25,12 +25,16 @@ export default function ChosungGame() {
 
   const [allGames, setAllGames] = useState([]);
 
-  // ============ API 함수들 ============
+  // ============ API 함수들 (헤더에 userid 추가) ============
 
   // 1. 모든 게임 목록 가져오기
   const fetchAllGames = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/game/all`);
+      const response = await fetch(`${API_BASE_URL}/game/all`, {
+        headers: {
+          'userid': userId,
+        },
+      });
       if (!response.ok) throw new Error('네트워크 응답 실패');
       const data = await response.json();
       console.log('모든 게임:', data);
@@ -44,14 +48,17 @@ export default function ChosungGame() {
   // 2. 특정 게임 정보 가져오기
   const fetchGame = async (gameId) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/game/get?gameId=${gameId}`);
+      const response = await fetch(`${API_BASE_URL}/game/get?gameId=${gameId}`, {
+        headers: {
+          'userid': userId,
+        },
+      });
       if (!response.ok) throw new Error('네트워크 응답 실패');
       const data = await response.json();
       console.log('게임 정보:', data);
       return data;
     } catch (error) {
       console.error('게임 정보 가져오기 실패:', error);
-      alert('게임 정보를 불러오는데 실패했습니다');
     }
   };
 
@@ -62,10 +69,10 @@ export default function ChosungGame() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'userid': userId,
         },
         body: JSON.stringify({
-          userId: userId,
-          // 필요한 다른 파라미터들 추가
+          // 필요한 파라미터들 추가
         }),
       });
       if (!response.ok) throw new Error('네트워크 응답 실패');
@@ -87,9 +94,9 @@ export default function ChosungGame() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'userid': userId,
         },
         body: JSON.stringify({
-          userId: userId,
           gameId: selectedGameId,
         }),
       });
@@ -116,9 +123,9 @@ export default function ChosungGame() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'userid': userId,
         },
         body: JSON.stringify({
-          userId: userId,
           gameId: gameId,
           answer: userAnswer,
         }),
@@ -141,9 +148,9 @@ export default function ChosungGame() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'userid': userId,
         },
         body: JSON.stringify({
-          userId: userId,
           gameId: gameId,
         }),
       });
@@ -166,6 +173,7 @@ export default function ChosungGame() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'userid': userId,
         },
         body: JSON.stringify({
           gameId: gameId,
@@ -185,6 +193,10 @@ export default function ChosungGame() {
 
   // 8. 회원가입
   const handleJoin = async () => {
+    if (!username.trim() || !password.trim()) {
+      alert('아이디와 비밀번호를 모두 입력해주세요!');
+      return;
+    }
     try {
       const response = await fetch(`${API_BASE_URL}/user/join`, {
         method: 'POST',
@@ -200,6 +212,9 @@ export default function ChosungGame() {
       const data = await response.json();
       console.log('회원가입 완료:', data);
       alert('회원가입이 완료되었습니다!');
+      setGameState('login');
+      setUsername('');
+      setPassword('');
     } catch (error) {
       console.error('회원가입 실패:', error);
       alert('회원가입에 실패했습니다');
@@ -208,6 +223,10 @@ export default function ChosungGame() {
 
   // 9. 로그인
   const handleLogin = async () => {
+    if (!username.trim() || !password.trim()) {
+      alert('아이디와 비밀번호를 모두 입력해주세요!');
+      return;
+    }
     try {
       const response = await fetch(`${API_BASE_URL}/user/login`, {
         method: 'POST',
@@ -222,8 +241,10 @@ export default function ChosungGame() {
       if (!response.ok) throw new Error('네트워크 응답 실패');
       const data = await response.json();
       console.log('로그인 완료:', data);
-      setUserId(data.userId);
+      setUserId(data.userId || data.id); // 백엔드 응답에 맞게 수정
       setGameState('lobby');
+      setUsername('');
+      setPassword('');
       alert('로그인 성공!');
     } catch (error) {
       console.error('로그인 실패:', error);
@@ -239,7 +260,7 @@ export default function ChosungGame() {
       const interval = setInterval(() => {
         endGameIfNeed();
         fetchGame(gameId);
-      }, 3000); // 3초마다 체크
+      }, 3000);
 
       return () => clearInterval(interval);
     }
@@ -247,10 +268,10 @@ export default function ChosungGame() {
 
   // 로비에 있을 때 게임 목록 가져오기
   useEffect(() => {
-    if (gameState === 'lobby') {
+    if (gameState === 'lobby' && userId) {
       fetchAllGames();
     }
-  }, [gameState]);
+  }, [gameState, userId]);
 
   // ============ 렌더링 ============
 
@@ -274,6 +295,7 @@ export default function ChosungGame() {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              onKeyPress={(e) => e.key === 'Enter' && handleLogin()}
               placeholder="비밀번호"
               className="w-full px-4 py-3 border-2 border-purple-300 rounded-xl focus:border-purple-500 focus:outline-none"
             />
@@ -284,9 +306,54 @@ export default function ChosungGame() {
               <LogIn className="w-5 h-5" />
               로그인
             </button>
+            <div className="text-center">
+              <button
+                onClick={() => setGameState('signup')}
+                className="text-purple-600 hover:text-purple-800 font-semibold transition-all"
+              >
+                계정이 없으신가요? 회원가입하기
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // 회원가입 화면
+  if (gameState === 'signup') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-purple-600 via-pink-500 to-orange-400 flex items-center justify-center p-4">
+        <div className="bg-white/95 backdrop-blur rounded-3xl shadow-2xl p-8 w-full max-w-md">
+          <button
+            onClick={() => setGameState('login')}
+            className="flex items-center gap-2 text-purple-600 hover:text-purple-800 mb-4 transition-all"
+          >
+            <ArrowLeft className="w-5 h-5" />
+            로그인으로 돌아가기
+          </button>
+          <h1 className="text-4xl font-bold text-center mb-8 bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
+            회원가입
+          </h1>
+          <div className="space-y-4">
+            <input
+              type="text"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder="아이디"
+              className="w-full px-4 py-3 border-2 border-purple-300 rounded-xl focus:border-purple-500 focus:outline-none"
+            />
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              onKeyPress={(e) => e.key === 'Enter' && handleJoin()}
+              placeholder="비밀번호"
+              className="w-full px-4 py-3 border-2 border-purple-300 rounded-xl focus:border-purple-500 focus:outline-none"
+            />
             <button
               onClick={handleJoin}
-              className="w-full bg-white text-purple-600 border-2 border-purple-600 font-bold py-3 rounded-xl hover:bg-purple-50 transition-all flex items-center justify-center gap-2"
+              className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold py-3 rounded-xl hover:shadow-lg hover:scale-105 transition-all flex items-center justify-center gap-2"
             >
               <UserPlus className="w-5 h-5" />
               회원가입
