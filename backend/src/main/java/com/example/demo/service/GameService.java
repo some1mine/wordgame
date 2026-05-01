@@ -5,7 +5,6 @@ import com.example.demo.domain.entity.GameInfo;
 import com.example.demo.domain.entity.UserInfo;
 import com.example.demo.domain.enums.RoleInGame;
 import com.example.demo.repository.GameRepository;
-import com.example.demo.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -15,6 +14,7 @@ import java.util.List;
 
 @Slf4j
 @Service
+@Transactional
 @RequiredArgsConstructor
 public class GameService {
 

@@ -7,7 +7,6 @@ import com.example.demo.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -30,7 +29,6 @@ public class GameController {
     public ResponseEntity<GameInfo> findById(@RequestParam(name = "gameid") long gameId) {
         return ResponseEntity.ok(gameService.findById(gameId));
     }
-    @Transactional
     @PostMapping("/make-game")
     public ResponseEntity<GameInfo> makeGame(@RequestHeader(name = "userid") String userId, @RequestBody GameInfo game) {
         UserInfo user = userService.findByUserId(userId);
@@ -38,7 +36,6 @@ public class GameController {
 
         return ResponseEntity.ok(gameService.makeGame(game, user));
     }
-    @Transactional
     @PostMapping("/join-game")
     public ResponseEntity<GameInfo> joinGame(@RequestHeader(name = "userid") String userId, @RequestParam(name = "gameid") long gameId) {
         UserInfo user = userService.findByUserId(userId);
@@ -50,7 +47,6 @@ public class GameController {
 
         return ResponseEntity.ok(gameService.joinGame(game, user));
     }
-    @Transactional
     @PostMapping("/submit")
     public ResponseEntity<UserInfo> submitWord(@RequestHeader(name = "userid") String userId, @RequestParam String word, @RequestParam(name = "gameid") long gameId) {
         UserInfo user = userService.findByUserId(userId);
@@ -61,7 +57,6 @@ public class GameController {
 
         return ResponseEntity.ok(gameService.submit(game, user, word));
     }
-    @Transactional
     @PostMapping("/exit-game")
     public ResponseEntity<UserInfo> exitGame(@RequestHeader(name = "userid") String userId, @RequestParam(name = "gameid") long gameId) {
         UserInfo user = userService.findByUserId(userId);
@@ -75,7 +70,6 @@ public class GameController {
         return ResponseEntity.ok(savedUser);
     }
 
-    @Transactional
     @PostMapping("/end-if-need")
     public ResponseEntity<GameInfo> endIfNeed(@RequestParam(name = "gameid") long gameId) {
         GameInfo game = gameService.findById(gameId);
