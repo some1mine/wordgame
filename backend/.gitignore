@@ -39,3 +39,4 @@ out/
 ### environments ###
 .env
 .env.*
+*test.yml

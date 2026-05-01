@@ -8,9 +8,11 @@ import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
 @SpringBootTest
+@ActiveProfiles("test")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class UserServiceTest {
     @Autowired UserService userService;
@@ -57,7 +59,7 @@ class UserServiceTest {
 
         GameInfo savedGame = gameService.save(game);
 
-        Assertions.assertThat(savedGame.getParticipants().get(0).getGame()).isEqualTo(game);
+        Assertions.assertThat(savedGame.getParticipants().getFirst().getGame()).isEqualTo(game);
     }
 
     @Test
@@ -65,7 +67,7 @@ class UserServiceTest {
     @Transactional
     void testJoinGame() {
         UserInfo user = userService.findByUserId("service");
-        GameInfo game = gameService.findAll().get(0);
+        GameInfo game = gameService.findAll().getFirst();
 
         user.setRoleInGame(RoleInGame.PARTICIPANT);
         user.setGame(game);
