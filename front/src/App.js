@@ -16,24 +16,17 @@ export default function ChosungGame() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   
-  const [players, setPlayers] = useState([
-    { id: 1, name: '플레이어1', answer: '과녁', status: 'correct', score: 120 },
-    { id: 2, name: '플레이어2', answer: '과느', status: 'wrong', score: 80 },
-    { id: 3, name: '플레이어3', answer: '기념', status: 'correct', score: 100 },
-    { id: 4, name: '나', answer: '', status: 'playing', score: 95 },
-  ]);
+  const [players, setPlayers] = useState([]);
 
   const [allGames, setAllGames] = useState([]);
 
-  // ============ API 함수들 (헤더에 userid 추가) ============
+  // ============ API 함수들 (세션 쿠키 사용) ============
 
   // 1. 모든 게임 목록 가져오기
   const fetchAllGames = async () => {
     try {
       const response = await fetch(`${API_BASE_URL}/game/all`, {
-        headers: {
-          'userid': userId,
-        },
+        credentials: 'include',
       });
       if (!response.ok) throw new Error('네트워크 응답 실패');
       const data = await response.json();
@@ -49,13 +42,19 @@ export default function ChosungGame() {
   const fetchGame = async (gameId) => {
     try {
       const response = await fetch(`${API_BASE_URL}/game/get?gameId=${gameId}`, {
-        headers: {
-          'userid': userId,
-        },
+        credentials: 'include',
       });
       if (!response.ok) throw new Error('네트워크 응답 실패');
       const data = await response.json();
       console.log('게임 정보:', data);
+      setChosung(data.initial);
+      setPlayers(data.participants.map((player) => ({
+        id: player.userId,
+        name: player.name || player.userId,
+        answer: '',
+        status: 'playing',
+        score: player.score,
+      })));
       return data;
     } catch (error) {
       console.error('게임 정보 가져오기 실패:', error);
@@ -67,12 +66,14 @@ export default function ChosungGame() {
     try {
       const response = await fetch(`${API_BASE_URL}/game/make-game`, {
         method: 'POST',
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
-          'userid': userId,
         },
         body: JSON.stringify({
-          // 필요한 파라미터들 추가
+          initial: chosung,
+          name: `${userId}의 방`,
+          capacity: 2,
         }),
       });
       if (!response.ok) throw new Error('네트워크 응답 실패');
@@ -92,9 +93,9 @@ export default function ChosungGame() {
     try {
       const response = await fetch(`${API_BASE_URL}/game/join-game`, {
         method: 'POST',
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
-          'userid': userId,
         },
         body: JSON.stringify({
           gameId: selectedGameId,
@@ -121,13 +122,13 @@ export default function ChosungGame() {
     try {
       const response = await fetch(`${API_BASE_URL}/game/submit`, {
         method: 'POST',
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
-          'userid': userId,
         },
         body: JSON.stringify({
           gameId: gameId,
-          answer: userAnswer,
+          word: userAnswer,
         }),
       });
       if (!response.ok) throw new Error('네트워크 응답 실패');
@@ -146,9 +147,9 @@ export default function ChosungGame() {
     try {
       const response = await fetch(`${API_BASE_URL}/game/exit-game`, {
         method: 'POST',
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
-          'userid': userId,
         },
         body: JSON.stringify({
           gameId: gameId,
@@ -171,9 +172,9 @@ export default function ChosungGame() {
     try {
       const response = await fetch(`${API_BASE_URL}/game/end-if-need`, {
         method: 'POST',
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
-          'userid': userId,
         },
         body: JSON.stringify({
           gameId: gameId,
@@ -204,7 +205,7 @@ export default function ChosungGame() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          username: username,
+          userId: username,
           password: password,
         }),
       });
@@ -230,18 +231,19 @@ export default function ChosungGame() {
     try {
       const response = await fetch(`${API_BASE_URL}/user/login`, {
         method: 'POST',
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          username: username,
+          userId: username,
           password: password,
         }),
       });
       if (!response.ok) throw new Error('네트워크 응답 실패');
       const data = await response.json();
       console.log('로그인 완료:', data);
-      setUserId(data.userId || data.id); // 백엔드 응답에 맞게 수정
+      setUserId(data.userId);
       setGameState('lobby');
       setUsername('');
       setPassword('');
@@ -392,15 +394,15 @@ export default function ChosungGame() {
               ) : (
                 allGames.map((game) => (
                   <div
-                    key={game.id}
+                    key={game.gameId}
                     className="p-4 border-2 border-purple-300 rounded-xl hover:bg-purple-50 transition-all flex justify-between items-center"
                   >
                     <div>
-                      <p className="font-semibold text-gray-800">게임 #{game.id}</p>
-                      <p className="text-sm text-gray-500">참가자: {game.playerCount}명</p>
+                      <p className="font-semibold text-gray-800">{game.name}</p>
+                      <p className="text-sm text-gray-500">참가자: {game.participants.length}/{game.capacity}명</p>
                     </div>
                     <button
-                      onClick={() => joinGame(game.id)}
+                      onClick={() => joinGame(game.gameId)}
                       className="bg-purple-600 text-white font-bold px-6 py-2 rounded-lg hover:bg-purple-700 transition-all"
                     >
                       참가하기
