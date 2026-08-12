@@ -3,6 +3,7 @@ package com.example.demo.common.security.config;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -24,14 +25,18 @@ public class WebConfig  implements WebMvcConfigurer {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         return http
                 .csrf(AbstractHttpConfigurer::disable) // csrf disable
+                .cors(Customizer.withDefaults())
                 .headers(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(authz ->
                         authz
-                                .requestMatchers(new AntPathRequestMatcher("/user/**")).permitAll()
-                                .requestMatchers(new AntPathRequestMatcher("/game/**")).permitAll()
+                                .requestMatchers(new AntPathRequestMatcher("/user/join")).permitAll()
+                                .requestMatchers(new AntPathRequestMatcher("/user/login")).permitAll()
                                 .requestMatchers(new AntPathRequestMatcher("/h2-console/**")).permitAll()
                                 .anyRequest().authenticated()
                 )
+                .exceptionHandling(exception -> exception.authenticationEntryPoint(
+                        (request, response, error) -> response.sendError(401)
+                ))
                 .build();
     }
 

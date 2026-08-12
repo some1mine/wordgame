@@ -2,6 +2,7 @@ package com.example.demo.domain.entity;
 
 import com.example.demo.domain.enums.RoleInGame;
 import com.fasterxml.jackson.annotation.JsonBackReference;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.ColumnDefault;
@@ -10,7 +11,6 @@ import org.hibernate.annotations.DynamicUpdate;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
-import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.LocalDateTime;
 
@@ -30,8 +30,11 @@ public class UserInfo {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long userKey;
 
+    @Column(nullable = false, unique = true)
     private String userId;
 
+    @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
+    @Column(nullable = false)
     private String password;
 
     private String name;
@@ -58,10 +61,5 @@ public class UserInfo {
     private LocalDateTime modifiedDate;
 
     private LocalDateTime lastLoginDate;
-
-    public UserInfo passwordEncodedUser(PasswordEncoder passwordEncoder) {
-        this.setPassword(passwordEncoder.encode(this.password));
-        return this;
-    }
 
 }
