@@ -1,138 +1,130 @@
 package com.example.demo.controller;
 
-import com.example.demo.domain.entity.GameInfo;
-import com.example.demo.domain.entity.UserInfo;
-import com.example.demo.domain.enums.RoleInGame;
+import com.example.demo.repository.GameRepository;
+import com.example.demo.repository.UserRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.junit.jupiter.api.*;
-import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.junit.jupiter.SpringExtension;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
+
+import java.util.Map;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @ActiveProfiles("test")
-@ExtendWith(SpringExtension.class)
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.MOCK)
-@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @AutoConfigureMockMvc
-@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class GameControllerTest {
-    @Autowired
-    MockMvc mockMvc;
-    @Autowired
-    ObjectMapper objectMapper;
 
-    @Test
-    @Order(0)
-    void join() throws Exception {
-        String content = objectMapper.writeValueAsString(UserInfo.builder().userId("controller").password("password").roleInGame(RoleInGame.NONE).build());
-        String content2 = objectMapper.writeValueAsString(UserInfo.builder().userId("userid").password("password").roleInGame(RoleInGame.NONE).build());
-        mockMvc.perform(post("/user/join")
-                        .content(content)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .accept(MediaType.APPLICATION_JSON))
-                .andExpect(status().isOk())
-                .andDo(print());
+    @Autowired MockMvc mockMvc;
+    @Autowired ObjectMapper objectMapper;
+    @Autowired UserRepository userRepository;
+    @Autowired GameRepository gameRepository;
 
-        mockMvc.perform(post("/user/join")
-                        .content(content2)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .accept(MediaType.APPLICATION_JSON))
-                .andExpect(status().isOk())
-                .andDo(print());
+    @BeforeEach
+    void cleanDatabase() {
+        userRepository.deleteAll();
+        gameRepository.deleteAll();
     }
 
     @Test
-    @Order(1)
-    void getAllGamesTest() throws Exception {
-        mockMvc.perform(get("/game/all")
+    void registrationLoginCreateJoinSubmitAndEndFlow() throws Exception {
+        MockHttpSession hostSession = registerAndLogin("host");
+        MockHttpSession guestSession = registerAndLogin("guest");
+
+        MvcResult makeResult = mockMvc.perform(post("/game/make-game")
+                        .session(hostSession)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .accept(MediaType.APPLICATION_JSON))
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "initial", "ㄱㅂ",
+                                "name", "test-room",
+                                "capacity", 2
+                        ))))
                 .andExpect(status().isOk())
-                .andDo(print());
-    }
+                .andExpect(jsonPath("$.isStarted").value(false))
+                .andExpect(jsonPath("$.participants.length()").value(1))
+                .andReturn();
+        long gameId = objectMapper.readTree(makeResult.getResponse().getContentAsString())
+                .get("gameId").asLong();
 
-    @Test
-    @Order(2)
-    void getGameTest() throws Exception {
-        mockMvc.perform(get("/game/get")
-                        .param("gameid", "1")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .accept(MediaType.APPLICATION_JSON))
-                .andExpect(status().isOk())
-                .andDo(print());
-    }
-
-
-    @Test
-    @Order(3)
-    void makeGameTest() throws Exception {
-        String content = objectMapper.writeValueAsString(GameInfo.builder().initial("ㄱㄴ").name("ㄱㄴ").capacity(5).isEnded(false).build());
-
-        mockMvc.perform(post("/game/make-game")
-                        .header("userid", "controller")
-                        .content(content)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .accept(MediaType.APPLICATION_JSON))
-                .andExpect(status().isOk())
-                .andDo(print());
-    }
-
-    @Test
-    @Order(4)
-    void joinGameTest() throws Exception {
         mockMvc.perform(post("/game/join-game")
-                        .header("userid", "userid")
-                        .param("gameid", "1")
+                        .session(guestSession)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .accept(MediaType.APPLICATION_JSON))
+                        .content(objectMapper.writeValueAsString(Map.of("gameId", gameId))))
                 .andExpect(status().isOk())
-                .andDo(print());
-    }
+                .andExpect(jsonPath("$.isStarted").value(true))
+                .andExpect(jsonPath("$.participants.length()").value(2));
 
-    @Test
-    @Order(5)
-    void submitTest() throws Exception {
-        mockMvc.perform(post("/game/exit-game")
-                        .header("userid", "controller")
-                        .param("word", "그네")
-                        .param("gameid", "1")
+        for (int attempt = 1; attempt <= 4; attempt++) {
+            mockMvc.perform(post("/game/submit")
+                            .session(guestSession)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(Map.of(
+                                    "gameId", gameId,
+                                    "word", "나비"
+                            ))))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.eliminated").value(false))
+                    .andExpect(jsonPath("$.game.isEnded").value(false));
+        }
+
+        mockMvc.perform(post("/game/submit")
+                        .session(guestSession)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .accept(MediaType.APPLICATION_JSON))
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "gameId", gameId,
+                                "answer", "나비"
+                        ))))
                 .andExpect(status().isOk())
-                .andDo(print());
-    }
+                .andExpect(jsonPath("$.eliminated").value(true))
+                .andExpect(jsonPath("$.game.isEnded").value(true));
 
-    @Test
-    @Order(6)
-    void exitGameTest() throws Exception {
-        mockMvc.perform(post("/game/exit-game")
-                        .header("userid", "userid")
-                        .param("gameid", "1")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .accept(MediaType.APPLICATION_JSON))
-                .andExpect(status().isOk())
-                .andDo(print());
-    }
-
-    @Test
-    @Order(7)
-    void endIfNeedTest() throws Exception {
         mockMvc.perform(post("/game/end-if-need")
-                        .param("gameid", "1")
+                        .session(hostSession)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .accept(MediaType.APPLICATION_JSON))
+                        .content(objectMapper.writeValueAsString(Map.of("gameId", gameId))))
                 .andExpect(status().isOk())
-                .andDo(print());
+                .andExpect(jsonPath("$.isEnded").value(true));
+
+        mockMvc.perform(get("/user/myinfo").session(hostSession))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.wins").value(1));
+        mockMvc.perform(get("/user/myinfo").session(guestSession))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.loses").value(1));
     }
 
+    @Test
+    void gameEndpointsRequireAuthenticatedSession() throws Exception {
+        mockMvc.perform(get("/game/all"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    private MockHttpSession registerAndLogin(String userId) throws Exception {
+        String credentials = objectMapper.writeValueAsString(Map.of(
+                "userId", userId,
+                "password", "password"
+        ));
+        mockMvc.perform(post("/user/join")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(credentials))
+                .andExpect(status().isCreated());
+
+        MvcResult loginResult = mockMvc.perform(post("/user/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(credentials))
+                .andExpect(status().isOk())
+                .andReturn();
+        return (MockHttpSession) loginResult.getRequest().getSession(false);
+    }
 }

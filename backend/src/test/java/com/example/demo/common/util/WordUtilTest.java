@@ -1,15 +1,26 @@
 package com.example.demo.common.util;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 
-@SpringBootTest
+import static org.assertj.core.api.Assertions.assertThat;
+
 class WordUtilTest {
-    @Autowired WordUtil wordUtil;
+
+    private final WordUtil wordUtil = new WordUtil();
 
     @Test
-    void exists() {
-        System.out.println(wordUtil.exists("존재"));
+    void convertsHangulSyllablesToInitialConsonants() {
+        assertThat(wordUtil.getInitials("가방")).isEqualTo("ㄱㅂ");
+        assertThat(wordUtil.getInitials("초성게임")).isEqualTo("ㅊㅅㄱㅇ");
+    }
+
+    @Test
+    void keepsInitialConsonantsAsTheyAre() {
+        assertThat(wordUtil.getInitials("ㄱㅂ")).isEqualTo("ㄱㅂ");
+    }
+
+    @Test
+    void handlesEmptyInput() {
+        assertThat(wordUtil.getInitials("")).isEmpty();
     }
 }
