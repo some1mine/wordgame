@@ -39,7 +39,13 @@ public class GameInfo {
 
     @ColumnDefault("0")
     @Convert(converter = TrueFalseConverter.class)
-    private Boolean isEnded;
+    @Builder.Default
+    private Boolean isEnded = false;
+
+    @ColumnDefault("0")
+    @Convert(converter = TrueFalseConverter.class)
+    @Builder.Default
+    private Boolean isStarted = false;
 
     @CreatedDate
     private LocalDateTime createdDate;

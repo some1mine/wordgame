@@ -1,78 +1,91 @@
 package com.example.demo.service;
 
-import com.example.demo.domain.enums.RoleInGame;
 import com.example.demo.domain.entity.GameInfo;
 import com.example.demo.domain.entity.UserInfo;
-import org.assertj.core.api.Assertions;
-import org.junit.jupiter.api.*;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
+import com.example.demo.domain.enums.RoleInGame;
+import com.example.demo.repository.UserRepository;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.transaction.annotation.Transactional;
 
-@SpringBootTest
-@ActiveProfiles("test")
-@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+import java.util.Optional;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.*;
+
+@ExtendWith(MockitoExtension.class)
 class UserServiceTest {
-    @Autowired UserService userService;
-    @Autowired GameService gameService;
-    @Autowired PasswordEncoder passwordEncoder;
 
-    @Test
-    @Order(1)
-    void testJoin(){
-        UserInfo user = UserInfo.builder().userId("service").password("password").name("유저").build();
-        UserInfo savedUser = userService.save(user);
+    @Mock UserRepository userRepository;
+    @Mock PasswordEncoder passwordEncoder;
 
-        Assertions.assertThat(user.getUserId() + user.getPassword()).isEqualTo(savedUser.getUserId() + savedUser.getPassword());
+    private UserService userService;
+
+    @BeforeEach
+    void setUp() {
+        userService = new UserService(userRepository, passwordEncoder);
     }
 
     @Test
-    @Order(2)
-    void testLogin() {
-        UserInfo userInfo = UserInfo.builder().userId("service").password("password").roleInGame(RoleInGame.NONE).build();
-        UserInfo foundUser = userService.findByUserId(userInfo.passwordEncodedUser(passwordEncoder).getUserId());
+    void registerEncodesPasswordAndInitializesUser() {
+        when(passwordEncoder.encode("plain")).thenReturn("encoded");
+        when(userRepository.save(any(UserInfo.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        Assertions.assertThat(foundUser.getName()).isEqualTo("유저");
+        UserInfo result = userService.register("user", "plain", "name");
+
+        assertThat(result.getPassword()).isEqualTo("encoded");
+        assertThat(result.getWins()).isZero();
+        assertThat(result.getLoses()).isZero();
+        assertThat(result.getRoleInGame()).isEqualTo(RoleInGame.NONE);
     }
 
     @Test
-    @Order(3)
-    void testMyInfo() {
-        String userId = "service";
-        UserInfo foundUser = userService.findByUserId(userId);
+    void authenticateAcceptsCorrectRawPasswordWithoutReencoding() {
+        UserInfo user = UserInfo.builder().userId("user").password("encoded").build();
+        when(userRepository.findByUserId("user")).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("plain", "encoded")).thenReturn(true);
+        when(userRepository.save(user)).thenReturn(user);
 
-        Assertions.assertThat(foundUser.getName()).isEqualTo("유저");
+        UserInfo result = userService.authenticate("user", "plain");
+
+        assertThat(result).isSameAs(user);
+        assertThat(result.getLastLoginDate()).isNotNull();
+        verify(passwordEncoder, never()).encode(anyString());
     }
 
     @Test
-    @Order(4)
-    void testMakeGame() {
-        UserInfo user = userService.findByUserId("service");
-        user.setScore(5);
-        user.setRoleInGame(RoleInGame.HOST);
+    void authenticateRejectsWrongPassword() {
+        UserInfo user = UserInfo.builder().userId("user").password("encoded").build();
+        when(userRepository.findByUserId("user")).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("wrong", "encoded")).thenReturn(false);
 
-        GameInfo game = GameInfo.builder().initial("ㄷㅈ").name("동주").capacity(10).isEnded(false).build();
-        user.setGame(game);
-        game.getParticipants().add(user);
-
-        GameInfo savedGame = gameService.save(game);
-
-        Assertions.assertThat(savedGame.getParticipants().getFirst().getGame()).isEqualTo(game);
+        assertThat(userService.authenticate("user", "wrong")).isNull();
+        verify(userRepository, never()).save(any());
     }
 
     @Test
-    @Order(5)
-    @Transactional
-    void testJoinGame() {
-        UserInfo user = userService.findByUserId("service");
-        GameInfo game = gameService.findAll().getFirst();
+    void findByUserIdReturnsNullWhenMissing() {
+        when(userRepository.findByUserId("missing")).thenReturn(Optional.empty());
 
-        user.setRoleInGame(RoleInGame.PARTICIPANT);
-        user.setGame(game);
-
-        Assertions.assertThat(gameService.joinGame(game, user).getParticipants().stream().anyMatch(p -> p.equals(user))).isEqualTo(true);
+        assertThat(userService.findByUserId("missing")).isNull();
     }
 
+    @Test
+    void plusWinCountDoesNotReencodePassword() {
+        UserInfo user = UserInfo.builder()
+                .userId("winner").password("encoded").wins(2).score(4)
+                .roleInGame(RoleInGame.HOST).game(GameInfo.builder().build()).build();
+        when(userRepository.save(user)).thenReturn(user);
+
+        UserInfo result = userService.plusWinCount(user);
+
+        assertThat(result.getWins()).isEqualTo(3);
+        assertThat(result.getGame()).isNull();
+        assertThat(result.getScore()).isNull();
+        assertThat(result.getRoleInGame()).isEqualTo(RoleInGame.NONE);
+        verifyNoInteractions(passwordEncoder);
+    }
 }

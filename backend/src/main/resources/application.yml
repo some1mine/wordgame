@@ -1,4 +1,9 @@
 spring:
+  config:
+    import:
+      - "optional:file:.env[.properties]"
+      - "optional:file:backend/.env[.properties]"
+
   h2:
     console:
       enabled: true
@@ -36,8 +41,9 @@ server:
     session:
       cookie:
         http-only: true
-        secure: true
+        secure: ${SESSION_COOKIE_SECURE:false}
+        same-site: lax
 
 korean-dic:
   request-url: https://krdict.korean.go.kr/api/search
-  api-key: ${API_KEY}
+  api-key: ${KOREAN_DICTIONARY_API_KEY:}

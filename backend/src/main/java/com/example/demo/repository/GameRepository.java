@@ -7,4 +7,6 @@ import java.util.List;
 
 public interface GameRepository extends JpaRepository<GameInfo, Long> {
     List<GameInfo> findByIsEndedFalse();
+
+    List<GameInfo> findByIsEndedFalseAndIsStartedFalse();
 }
