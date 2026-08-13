@@ -20,13 +20,15 @@
 | 백엔드 | Java 21, Spring Boot 3.3, Spring MVC, Spring Security |
 | 데이터 | Spring Data JPA, Hibernate, H2 |
 | 테스트 | JUnit 5, Mockito, AssertJ, MockMvc, React Testing Library |
-| 빌드 | Gradle Wrapper, npm |
+| 빌드·배포 | Gradle Wrapper, npm, Docker, GitHub Actions |
 
 ## 프로젝트 구조
 
 ```text
 wordgame/
+├─ .github/workflows/   # 테스트 및 Docker Hub 이미지 게시
 ├─ backend/
+│  ├─ Dockerfile
 │  ├─ src/main/java/com/example/demo/
 │  │  ├─ common/       # 보안 설정과 공통 유틸리티
 │  │  ├─ controller/   # 사용자 및 게임 REST API
@@ -36,13 +38,16 @@ wordgame/
 │  │  └─ service/      # 인증과 게임 진행 로직
 │  └─ src/test/        # 단위·통합 테스트
 └─ front/
+   ├─ Dockerfile
+   ├─ nginx.conf        # SPA 정적 파일 제공
    └─ src/             # React 화면과 테스트
 ```
 
 ## 사전 요구사항
 
 - JDK 21
-- Node.js 및 npm
+- Node.js 22 및 npm
+- Docker (컨테이너 이미지 로컬 빌드 시)
 - 국립국어원 한국어기초사전 API 인증키
 
 ## 환경변수 설정
@@ -84,6 +89,46 @@ npm start
 ```
 
 프론트엔드는 기본적으로 `http://localhost:3000`에서 실행됩니다. 로그인 후 브라우저가 받은 세션 쿠키는 이후 게임 API 요청에 자동으로 포함됩니다.
+
+## Docker 실행
+
+백엔드와 프론트엔드는 각각 독립된 이미지로 빌드됩니다. `.dockerignore`가 로컬 `.env`, 빌드 산출물과 의존성 디렉터리를 이미지 빌드 컨텍스트에서 제외합니다.
+
+```powershell
+docker build -t wordgame-backend:local .\backend
+docker build --build-arg REACT_APP_API_BASE_URL=http://localhost:8080 -t wordgame-frontend:local .\front
+
+docker run --rm -p 8080:8080 `
+  -e KOREAN_DICTIONARY_API_KEY=your-api-key `
+  -e SPRING_DATASOURCE_HIKARI_JDBC_URL=jdbc:h2:file:/data/word-initial-game `
+  -v wordgame-data:/data `
+  wordgame-backend:local
+
+docker run --rm -p 3000:80 wordgame-frontend:local
+```
+
+`REACT_APP_API_BASE_URL`은 React 정적 파일을 만드는 시점에 포함되는 값입니다. 실제 서비스 주소로 이미지를 빌드해야 하며, 백엔드 API 인증키는 이미지에 넣지 않고 컨테이너 실행 환경변수로 전달합니다.
+
+## GitHub Actions CI/CD
+
+`.github/workflows/docker-publish.yml`은 다음 순서로 실행됩니다.
+
+1. 백엔드 테스트와 프론트엔드 테스트·프로덕션 빌드를 병렬 실행합니다.
+2. 두 검증이 성공하면 백엔드와 프론트엔드 Docker 이미지를 병렬 빌드합니다.
+3. Pull Request에서는 이미지 빌드까지만 검증합니다.
+4. `master` 푸시, `v*.*.*` 태그 또는 수동 실행에서는 Docker Hub에 이미지를 푸시합니다.
+
+Docker Hub에서 `wordgame-backend`, `wordgame-frontend` 저장소를 만든 뒤 GitHub 저장소에 다음 설정을 추가합니다.
+
+| 종류 | 이름 | 값 |
+| --- | --- | --- |
+| Actions secret | `DOCKERHUB_TOKEN` | Docker Hub에서 새로 발급한 Read & Write 액세스 토큰 |
+| Actions variable (선택) | `DOCKERHUB_USERNAME` | 기본값 `thedeny1106`을 다른 네임스페이스로 바꿀 때 사용 |
+| Actions variable (선택) | `REACT_APP_API_BASE_URL` | 프론트엔드 이미지에 포함할 백엔드 공개 URL |
+
+게시되는 이미지 이름은 기본적으로 `thedeny1106/wordgame-backend`, `thedeny1106/wordgame-frontend`입니다. `master`에서는 `latest`, `master`, `sha-<커밋>` 태그를, `v1.2.3` 같은 Git 태그에서는 `1.2.3`, `1.2`, `sha-<커밋>` 태그를 생성합니다.
+
+대화나 로그에 노출된 Docker Hub 토큰은 재사용하지 말고 Docker Hub에서 폐기한 다음 새 토큰만 `DOCKERHUB_TOKEN` Secret으로 등록해야 합니다.
 
 ## 게임 진행 방식
 

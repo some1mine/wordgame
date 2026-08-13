@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Users, Trophy, Clock, CheckCircle, XCircle, LogIn, UserPlus, Plus, DoorOpen, ArrowLeft } from 'lucide-react';
 
-// API 기본 URL 설정
-const API_BASE_URL = 'http://localhost:8080';
+// 빌드 환경에서 API 주소를 주입하고, 로컬 개발에서는 기본 주소를 사용합니다.
+const API_BASE_URL = (process.env.REACT_APP_API_BASE_URL || 'http://localhost:8080').replace(/\/$/, '');
 
 export default function ChosungGame() {
   const [gameState, setGameState] = useState('login'); // login, signup, lobby, playing, result
